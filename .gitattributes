@@ -1,0 +1,14 @@
+# Keep the repository LF: these are Java, properties and XML files that
+# Eclipse and javac both read fine with LF, and a mixed checkout is what makes
+# a diff touch every line.
+* text=auto eol=lf
+
+*.java text eol=lf
+*.properties text eol=lf
+*.xml text eol=lf
+*.txt text eol=lf
+*.mf text eol=lf
+
+*.png binary
+*.gif binary
+*.jar binary
