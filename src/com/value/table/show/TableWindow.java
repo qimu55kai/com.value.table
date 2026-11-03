@@ -183,11 +183,12 @@ public class TableWindow {
      */
     private Runnable pendingColumnLoad;
     /**
-     * False from the moment a column page is asked for until the bar leaves
-     * that end region again, so one drag loads one page even if the platform
-     * keeps the thumb against the right edge while the columns are inserted.
+     * Set when a page of columns was asked for and brought nothing - the read
+     * failed, or the model had no more to give - and cleared once the bar
+     * leaves the end region. Without it a failed page would be asked for again
+     * by the next paint, for ever.
      */
-    private boolean columnLoadArmed = true;
+    private boolean columnPageStalled;
     /**
      * The column that sat at the left edge of the view before the last page of
      * columns arrived, or -1 when no page has been asked for since the window
@@ -341,9 +342,11 @@ public class TableWindow {
          * The label column has no scroll bar of its own, so it is scrolled from
          * the main table. Painting is the one event every kind of scrolling ends
          * with - thumb, wheel, keyboard - which makes it the reliable place to
-         * notice that the two have drifted apart.
+         * notice that the two have drifted apart. The same event is where a
+         * missing page of columns is noticed, for the same reason.
          */
         this.mainTable.addListener(SWT.Paint, event -> {
+            maybeLoadMoreColumns();
             if (syncPending || frozenTable == null || frozenTable.isDisposed()) {
                 return;
             }
@@ -366,19 +369,18 @@ public class TableWindow {
         this.mainTable.getHorizontalBar().addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
-                ScrollBar bar = mainTable.getHorizontalBar();
-                if (!nearEnd(bar)) {
+                if (!nearEnd(mainTable.getHorizontalBar())) {
                     /*
-                     * Off the far end: the next arrival there is a new request
-                     * rather than the tail of this one.
+                     * Off the far end again: a page that was only asked for
+                     * because the bar was there a moment ago is no longer
+                     * wanted, and a page that failed may be tried again on the
+                     * next arrival.
                      */
-                    columnLoadArmed = true;
+                    cancelPendingColumnLoad();
+                    columnPageStalled = false;
                     return;
                 }
-                if (columnLoadArmed) {
-                    columnLoadArmed = false;
-                    scheduleColumnLoad();
-                }
+                maybeLoadMoreColumns();
             }
         });
 
@@ -532,6 +534,39 @@ public class TableWindow {
     }
 
     /**
+     * Asks for the next page of columns while the view has reached the columns
+     * that are already loaded.
+     * <p>
+     * Called from every scroll event <em>and</em> from every paint, because
+     * neither alone covers the ways a table is scrolled. Moving the view
+     * programmatically - which is what happens when a page of columns is
+     * inserted, or when a failed attempt is repaired - sends no selection event
+     * at all, and a bar that already sits at its end has nothing left to
+     * report: the drag towards it, and the one after it, arrive as no event
+     * whatsoever. Painting happens whenever the view changes for any reason, so
+     * what is read there is where the view is, not what the bar last said.
+     * </p>
+     * <p>
+     * There is no "armed" flag any more, and its absence is the fix. One used
+     * to allow one page per gesture, and it was spent a screen before the end -
+     * where a page deliberately starts - so reaching the end itself, and every
+     * drag that began there, found it already used up. The page is the limit
+     * now: it makes the content longer than the view, which takes the bar out
+     * of the end region by itself, so the next page waits for the user to come
+     * back rather than for a flag to be re-armed.
+     * </p>
+     */
+    private void maybeLoadMoreColumns() {
+        if (this.mainTable == null || this.mainTable.isDisposed() || this.model == null
+                || this.loadingMore || this.pendingColumnLoad != null || this.columnPageStalled) {
+            return;
+        }
+        if (this.model.hasMoreColumns() && nearEnd(this.mainTable.getHorizontalBar())) {
+            scheduleColumnLoad();
+        }
+    }
+
+    /**
      * Called after any vertical scrolling, however it happened: the wheel does
      * not move the scroll bar's thumb through a selection event, so listening to
      * the bar alone would miss the common case.
@@ -614,7 +649,6 @@ public class TableWindow {
             return;
         }
         this.mainTable.showColumn(this.columns[anchor]);
-        this.columnLoadArmed = true;
     }
 
     /**
@@ -1160,6 +1194,12 @@ public class TableWindow {
             return;
         }
         this.loadingMore = true;
+        /*
+         * How wide the table was before this page, so a page that brought no
+         * columns can be told apart from one that did: the former must not be
+         * asked for again until the bar leaves the end.
+         */
+        final int colsBefore = this.data == null ? 0 : this.data.getColCount();
         if (this.statusLabel != null && !this.statusLabel.isDisposed()) {
             this.statusLabel.setText(Messages.get("window.status.readingMore"));
         }
@@ -1175,6 +1215,14 @@ public class TableWindow {
                     m.ensureShape(wantRows, wantCols);
                     snapshot = m.toData();
                 } catch (OperationCanceledException e) {
+                    /*
+                     * A cancelled page must not leave the flag set: it is what
+                     * keeps a second page from starting, so it would cost every
+                     * page after this one.
+                     */
+                    if (!shell.isDisposed()) {
+                        display.asyncExec(() -> loadingMore = false);
+                    }
                     return Status.CANCEL_STATUS;
                 } catch (Throwable t) {
                     failure = t;
@@ -1192,8 +1240,13 @@ public class TableWindow {
                         statusLabel.setText(Messages.bind("window.status.readMoreFailed",
                                 error.getClass().getSimpleName()
                                         + (error.getMessage() == null ? "" : " - " + error.getMessage())));
+                        columnPageStalled = cols;
                     } else {
                         applyData(result);
+                        if (cols && result.getColCount() <= colsBefore) {
+                            // Asked for columns, got none: stop asking.
+                            columnPageStalled = true;
+                        }
                     }
                 });
                 return Status.OK_STATUS;
