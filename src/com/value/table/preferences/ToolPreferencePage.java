@@ -54,6 +54,44 @@ public class ToolPreferencePage extends PreferencePage implements IWorkbenchPref
 
     private static final int COLUMN_COUNT = 4;
 
+    /**
+     * The width a control that holds long text is allowed to ask for on its
+     * own, in pixels.
+     * <p>
+     * The preference dialog sizes the page from the natural width of its
+     * contents: {@code PreferenceDialog.showPage} hands
+     * {@code page.computeSize()} to the surrounding {@code ScrolledComposite}
+     * as its minimum size. A text field reports the width of the text it holds
+     * and a wrapping label reports its longest line, so one long default value
+     * - the method blacklist - or one long sentence of explanation was enough
+     * to make the page wider than the dialog and put a horizontal scroll bar
+     * under it. A small hint keeps that width out of the sum. The layout still
+     * stretches the control to the column it is given, and a wrapping label
+     * re-wraps to that width, so nothing is lost but the demand.
+     * </p>
+     */
+    private static final int MIN_WIDTH = 100;
+
+    /**
+     * The same for a label that wraps, in pixels.
+     * <p>
+     * A wrapping label is taller the narrower it is asked to be, and the
+     * minimum size of the page is used for the height as well, so a hint that
+     * is too small turns one long sentence into a page that scrolls vertically
+     * for no reason. This is a compromise: wide enough that the height is
+     * close to what the layout ends up using, narrow enough that the page still
+     * fits a normal dialog.
+     * </p>
+     */
+    private static final int WRAP_WIDTH = 700;
+
+    /**
+     * Width of the buttons in the column to the right of the rule table, in
+     * pixels. Left alone a push button asks for about 27 of them, which is less
+     * than a two-character label needs, and the platform clips the text.
+     */
+    private static final int BUTTON_WIDTH = 72;
+
     private Table table;
     private final List<TableItem> items = new ArrayList<TableItem>();
     private Button removeBut;
@@ -160,6 +198,7 @@ public class ToolPreferencePage extends PreferencePage implements IWorkbenchPref
 
         removeBut = new Button(parent, SWT.PUSH);
         removeBut.setText(Messages.get("pref.remove"));
+        removeBut.setLayoutData(buttonWidth());
         removeBut.setEnabled(false);
         removeBut.addSelectionListener(new SelectionListener() {
             @Override
@@ -180,6 +219,7 @@ public class ToolPreferencePage extends PreferencePage implements IWorkbenchPref
 
         Button help = new Button(parent, SWT.PUSH);
         help.setText(Messages.get("pref.help.button"));
+        help.setLayoutData(buttonWidth());
         help.addSelectionListener(new SelectionListener() {
             @Override
             public void widgetSelected(SelectionEvent e) {
@@ -193,29 +233,35 @@ public class ToolPreferencePage extends PreferencePage implements IWorkbenchPref
 
         Group group = new Group(parent, SWT.NONE);
         group.setText(Messages.get("pref.rule.group"));
-        group.setLayout(new GridLayout(2, true));
+        /*
+         * Two columns of equal width would give the label column as much room
+         * as the text column, which is twice the width the labels need; the
+         * group is wide enough without it.
+         */
+        group.setLayout(new GridLayout(2, false));
         group.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
         new Label(group, SWT.NONE).setText(Messages.get("pref.rule.name"));
         className = new Text(group, SWT.BORDER | SWT.SINGLE);
-        className.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        className.setLayoutData(fillWidth());
         className.addModifyListener(createModifyListener());
 
         new Label(group, SWT.NONE).setText(Messages.get("pref.rule.rows"));
         getArray = new Text(group, SWT.BORDER | SWT.SINGLE);
-        getArray.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        getArray.setLayoutData(fillWidth());
         getArray.addModifyListener(createModifyListener());
 
         new Label(group, SWT.NONE).setText(Messages.get("pref.rule.rowLabels"));
         getRowName = new Text(group, SWT.BORDER | SWT.SINGLE);
-        getRowName.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        getRowName.setLayoutData(fillWidth());
 
         new Label(group, SWT.NONE).setText(Messages.get("pref.rule.colLabels"));
         getColName = new Text(group, SWT.BORDER | SWT.SINGLE);
-        getColName.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        getColName.setLayoutData(fillWidth());
 
         addBut = new Button(parent, SWT.PUSH);
         addBut.setText(Messages.get("pref.add"));
+        addBut.setLayoutData(buttonWidth());
         addBut.setEnabled(false);
         addBut.addSelectionListener(new SelectionListener() {
             @Override
@@ -302,13 +348,12 @@ public class ToolPreferencePage extends PreferencePage implements IWorkbenchPref
         group.setLayout(new GridLayout(1, false));
         group.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
 
-        Label note = new Label(group, SWT.WRAP);
-        note.setText(Messages.get("pref.columns.note"));
-        note.setLayoutData(new GridData(SWT.FILL, SWT.TOP, true, false));
+        note(group, Messages.get("pref.columns.note"), 1);
 
-        entityRules = new Text(group, SWT.MULTI | SWT.BORDER | SWT.V_SCROLL | SWT.H_SCROLL | SWT.WRAP);
+        entityRules = new Text(group, SWT.MULTI | SWT.BORDER | SWT.V_SCROLL | SWT.WRAP);
         GridData data = new GridData(SWT.FILL, SWT.FILL, true, false);
         data.heightHint = 70;
+        data.widthHint = MIN_WIDTH;
         entityRules.setLayoutData(data);
         entityRules.setToolTipText(Messages.get("pref.columns.example"));
     }
@@ -336,13 +381,11 @@ public class ToolPreferencePage extends PreferencePage implements IWorkbenchPref
         monitorGuard.setText(Messages.get("pref.monitorGuard"));
         monitorGuard.setLayoutData(spanTwo());
 
-        Label note = new Label(group, SWT.WRAP);
-        note.setText(Messages.get("pref.calls.note"));
-        note.setLayoutData(spanTwo());
+        note(group, Messages.get("pref.calls.note"), 2);
 
         new Label(group, SWT.NONE).setText(Messages.get("pref.blacklist.label"));
         blacklist = new Text(group, SWT.BORDER | SWT.SINGLE);
-        blacklist.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        blacklist.setLayoutData(fillWidth());
         blacklist.setToolTipText(Messages.get("pref.blacklist.tip"));
 
         new Label(group, SWT.NONE).setText(Messages.get("pref.timeout.label"));
@@ -375,11 +418,40 @@ public class ToolPreferencePage extends PreferencePage implements IWorkbenchPref
                 Messages.get("pref.language.system"),
                 Messages.get("pref.language.zh"),
                 Messages.get("pref.language.en") });
-        language.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        language.setLayoutData(fillWidth());
 
-        Label note = new Label(group, SWT.WRAP);
-        note.setText(Messages.get("pref.language.note"));
-        note.setLayoutData(spanTwo());
+        note(group, Messages.get("pref.language.note"), 2);
+    }
+
+    /**
+     * An explanatory sentence that wraps instead of widening the page.
+     *
+     * @param span columns to cover, in the parent's grid
+     */
+    private static void note(Composite parent, String text, int span) {
+        Label label = new Label(parent, SWT.WRAP);
+        label.setText(text);
+        GridData data = new GridData(SWT.FILL, SWT.TOP, true, false);
+        data.horizontalSpan = span;
+        data.widthHint = WRAP_WIDTH;
+        label.setLayoutData(data);
+    }
+
+    /**
+     * Layout data for a control that takes the width of its column and asks for
+     * nothing on its own - see {@link #MIN_WIDTH}.
+     */
+    private static GridData fillWidth() {
+        GridData data = new GridData(SWT.FILL, SWT.TOP, true, false);
+        data.widthHint = MIN_WIDTH;
+        return data;
+    }
+
+    /** See {@link #BUTTON_WIDTH}. */
+    private static GridData buttonWidth() {
+        GridData data = new GridData(SWT.FILL, SWT.CENTER, false, false);
+        data.widthHint = BUTTON_WIDTH;
+        return data;
     }
 
     private static GridData spanTwo() {
