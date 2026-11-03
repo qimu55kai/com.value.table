@@ -1055,10 +1055,41 @@ public class TableWindow {
         this.shell.layout(true, true);
     }
 
+    /**
+     * Copies the snapshot into the widgets, growing them where it grew.
+     * <p>
+     * Adding a column is nothing like adding a row to the native table. A row
+     * is one new item; a column makes Windows insert a cell into <em>every</em>
+     * item and lay the whole control out again, which measured at a quarter of
+     * a second per column with a hundred rows on screen - a page of hundred
+     * columns took 28 seconds, while a page of hundred rows took 35
+     * milliseconds. The same loop with redraw switched off takes 7 ms, so the
+     * cost is the repaints in between, not the work itself. Everything below
+     * therefore runs with redraw off whenever the shape is about to change.
+     * </p>
+     */
     private void syncTable() {
         String[] headers = this.data.getColName();
         int dataColumns = Math.max(0, headers.length - 1);
+        int rows = this.data.getRowCount();
+        boolean grows = rows > this.renderedRows
+                || dataColumns > (this.columns == null ? 0 : this.columns.length);
+        if (grows) {
+            this.mainTable.setRedraw(false);
+            this.frozenTable.setRedraw(false);
+        }
+        try {
+            syncColumns(headers, dataColumns);
+            syncCells(dataColumns, rows);
+        } finally {
+            if (grows) {
+                this.mainTable.setRedraw(true);
+                this.frozenTable.setRedraw(true);
+            }
+        }
+    }
 
+    private void syncColumns(String[] headers, int dataColumns) {
         if (dataColumns > 0 && (this.columns == null || this.columns.length < dataColumns)) {
             TableColumn[] grown = new TableColumn[dataColumns];
             if (this.columns != null) {
@@ -1078,9 +1109,12 @@ public class TableWindow {
                 this.columns[c].setText(text);
             }
         }
+    }
 
-        int rows = this.data.getRowCount();
+    private void syncCells(int dataColumns, int rows) {
         int firstNewRow = this.renderedRows;
+        /* Columns already on screen; a new row needs all of them, an old one only the rest. */
+        int knownCols = this.renderedCols;
 
         for (int i = firstNewRow; i < rows; i++) {
             new TableItem(this.frozenTable, SWT.NONE);
@@ -1099,12 +1133,21 @@ public class TableWindow {
             if (dataColumns == 0) {
                 continue;
             }
-            if (i >= firstNewRow || this.renderedCols < dataColumns) {
+            if (i >= firstNewRow) {
                 String[] line = new String[dataColumns];
                 for (int j = 0; j < dataColumns; j++) {
                     line[j] = this.data.getCell(i, j);
                 }
                 item.setText(line);
+            } else if (knownCols < dataColumns) {
+                /*
+                 * Only the columns that just arrived: rebuilding the whole line
+                 * for every loaded row would allocate and hand the platform
+                 * thousands of strings it already has.
+                 */
+                for (int j = knownCols; j < dataColumns; j++) {
+                    item.setText(j, this.data.getCell(i, j));
+                }
             }
         }
 
@@ -1114,7 +1157,7 @@ public class TableWindow {
             this.autosizeNewColumns();
         }
         this.renderedRows = rows;
-        this.renderedCols = Math.max(this.renderedCols, dataColumns);
+        this.renderedCols = Math.max(knownCols, dataColumns);
         this.trimRows(rows);
         this.styleNullRows();
         this.syncTop();
