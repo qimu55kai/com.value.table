@@ -88,20 +88,6 @@ public class TableWindow {
     private static final int CELL_W = 70;
     private static final int MAX_COL_W = 480;
     private static final int INDEX_W = 52;
-    /**
-     * Pause between the scroll bar coming to rest and a column page starting.
-     * A page creates a hundred columns, which on Windows inserts a cell into
-     * every row and lays the control out again; doing that while the platform
-     * is still tracking the thumb makes the list view lose its place.
-     */
-    private static final int COLUMN_LOAD_DELAY = 150;
-    /**
-     * When to check, after a page of columns has been inserted, that the view
-     * is still where the user left it. The platform can move it at the moment
-     * the columns are created or a moment later when the mouse button is
-     * released, so the check is repeated instead of trusted to once.
-     */
-    private static final int[] COLUMN_VIEW_CHECKS = { 200, 450, 800, 1300, 2000 };
     /** Prefix of the build stamp; technical, so it is not translated. */
     private static final String BUILD_PREFIX = "build ";
     /**
@@ -176,32 +162,6 @@ public class TableWindow {
     private volatile TableModel model;
     private volatile boolean loadingMore;
 
-    /**
-     * The column page waiting for the scroll to come to rest, or null. Held so
-     * that a later scroll can push the deadline back instead of starting a
-     * second page.
-     */
-    private Runnable pendingColumnLoad;
-    /**
-     * Set when a page of columns was asked for and brought nothing - the read
-     * failed, or the model had no more to give - and cleared once the bar
-     * leaves the end region. Without it a failed page would be asked for again
-     * by the next paint, for ever.
-     */
-    private boolean columnPageStalled;
-    /**
-     * The column that sat at the left edge of the view before the last page of
-     * columns arrived, or -1 when no page has been asked for since the window
-     * opened. Kept because a page is inserted while the user may still be
-     * holding the thumb: the platform then re-maps that held position onto the
-     * new, longer bar and the view lands on the far end of the new columns -
-     * where there is nothing left to drag towards, so the next gesture asks for
-     * nothing. {@link #watchColumnView} puts the view back.
-     */
-    private int columnAnchor = -1;
-    /** The pending view-restoring step, or null. */
-    private Runnable columnViewWatch;
-
     private Job job;
     private volatile Job moreJob;
 
@@ -261,8 +221,6 @@ public class TableWindow {
                 this.keyFilter = null;
             }
             cancelJob();
-            cancelPendingColumnLoad();
-            cancelColumnViewWatch();
             disposeColors();
         });
         this.shell.open();
@@ -342,11 +300,9 @@ public class TableWindow {
          * The label column has no scroll bar of its own, so it is scrolled from
          * the main table. Painting is the one event every kind of scrolling ends
          * with - thumb, wheel, keyboard - which makes it the reliable place to
-         * notice that the two have drifted apart. The same event is where a
-         * missing page of columns is noticed, for the same reason.
+         * notice that the two have drifted apart.
          */
         this.mainTable.addListener(SWT.Paint, event -> {
-            maybeLoadMoreColumns();
             if (syncPending || frozenTable == null || frozenTable.isDisposed()) {
                 return;
             }
@@ -369,18 +325,9 @@ public class TableWindow {
         this.mainTable.getHorizontalBar().addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
-                if (!nearEnd(mainTable.getHorizontalBar())) {
-                    /*
-                     * Off the far end again: a page that was only asked for
-                     * because the bar was there a moment ago is no longer
-                     * wanted, and a page that failed may be tried again on the
-                     * next arrival.
-                     */
-                    cancelPendingColumnLoad();
-                    columnPageStalled = false;
-                    return;
+                if (atEnd(mainTable.getHorizontalBar())) {
+                    loadMore(false, true);
                 }
-                maybeLoadMoreColumns();
             }
         });
 
@@ -504,69 +451,6 @@ public class TableWindow {
     }
 
     /**
-     * True when the bar is within one screen of its end.
-     * <p>
-     * Both page loads start here rather than at the end itself. A page arrives
-     * asynchronously and the widgets are grown when it does; if that happens
-     * while the thumb is pressed against the end, the platform re-maps the held
-     * position onto the longer bar and the view lands on the far end of the
-     * freshly loaded columns - the one place from where there is nothing to drag
-     * towards, so the next gesture asks for nothing at all. One screen of lead
-     * means the page is usually in place before the end is reached, and when it
-     * is not, there is still room to drag away from it.
-     * </p>
-     * <p>
-     * The distance is measured in the bar's own units, not in pixels: a table's
-     * scroll bar counts in its item units - pixels for columns, rows for rows -
-     * and its thumb is exactly one screen of them, at any scale factor.
-     * </p>
-     */
-    private static boolean nearEnd(ScrollBar bar) {
-        if (bar == null || bar.isDisposed() || !bar.getVisible()) {
-            return false;
-        }
-        int span = bar.getMaximum() - bar.getThumb();
-        if (span <= 0) {
-            return false;
-        }
-        int lead = Math.max(1, bar.getThumb());
-        return bar.getSelection() >= span - lead;
-    }
-
-    /**
-     * Asks for the next page of columns while the view has reached the columns
-     * that are already loaded.
-     * <p>
-     * Called from every scroll event <em>and</em> from every paint, because
-     * neither alone covers the ways a table is scrolled. Moving the view
-     * programmatically - which is what happens when a page of columns is
-     * inserted, or when a failed attempt is repaired - sends no selection event
-     * at all, and a bar that already sits at its end has nothing left to
-     * report: the drag towards it, and the one after it, arrive as no event
-     * whatsoever. Painting happens whenever the view changes for any reason, so
-     * what is read there is where the view is, not what the bar last said.
-     * </p>
-     * <p>
-     * There is no "armed" flag any more, and its absence is the fix. One used
-     * to allow one page per gesture, and it was spent a screen before the end -
-     * where a page deliberately starts - so reaching the end itself, and every
-     * drag that began there, found it already used up. The page is the limit
-     * now: it makes the content longer than the view, which takes the bar out
-     * of the end region by itself, so the next page waits for the user to come
-     * back rather than for a flag to be re-armed.
-     * </p>
-     */
-    private void maybeLoadMoreColumns() {
-        if (this.mainTable == null || this.mainTable.isDisposed() || this.model == null
-                || this.loadingMore || this.pendingColumnLoad != null || this.columnPageStalled) {
-            return;
-        }
-        if (this.model.hasMoreColumns() && nearEnd(this.mainTable.getHorizontalBar())) {
-            scheduleColumnLoad();
-        }
-    }
-
-    /**
      * Called after any vertical scrolling, however it happened: the wheel does
      * not move the scroll bar's thumb through a selection event, so listening to
      * the bar alone would miss the common case.
@@ -579,112 +463,8 @@ public class TableWindow {
         if (bar == null || !bar.getVisible()) {
             return;
         }
-        if (nearEnd(bar)) {
+        if (atEnd(bar)) {
             loadMore(true, false);
-        }
-    }
-
-    /**
-     * Starts the next column page once the horizontal scroll has come to rest.
-     * <p>
-     * Reading the page is not the point - the model has already read it - the
-     * point is <em>when</em> the widgets are grown. A page creates a hundred
-     * columns, and Windows answers every one of them by inserting a cell into
-     * each row and laying the whole list view out again. A sixth of a second of
-     * quiet before that is enough for the drag to have finished in the common
-     * case, which keeps the thumb and the picture in step; if the drag is
-     * somehow still running, {@link #watchColumnView} repairs the view after it
-     * ends.
-     * </p>
-     */
-    private void scheduleColumnLoad() {
-        if (this.pendingColumnLoad != null) {
-            this.display.timerExec(-1, this.pendingColumnLoad);
-        }
-        this.pendingColumnLoad = () -> {
-            this.pendingColumnLoad = null;
-            if (this.shell != null && !this.shell.isDisposed()) {
-                loadMore(false, true);
-            }
-        };
-        this.display.timerExec(COLUMN_LOAD_DELAY, this.pendingColumnLoad);
-    }
-
-    /** Drops a column page that was waiting, because the window is going away. */
-    private void cancelPendingColumnLoad() {
-        if (this.pendingColumnLoad != null) {
-            this.display.timerExec(-1, this.pendingColumnLoad);
-            this.pendingColumnLoad = null;
-        }
-    }
-
-    /**
-     * Puts the view back on the column it was showing, after a page of columns
-     * has been inserted under the user's hands.
-     * <p>
-     * A page is inserted asynchronously, so it can land while the thumb is still
-     * held against the right edge. The platform maps a held thumb onto whatever
-     * range the bar has at that moment, so the view ends up on the far end of
-     * the new columns instead of where it was; and from there nothing can be
-     * dragged towards, which is why the next gesture asked for nothing at all.
-     * The same thing can happen a moment later, when the button is released, so
-     * the check is repeated for a while rather than done once.
-     * </p>
-     * <p>
-     * Each check is a no-op unless the bar is still at its very end, so this
-     * never moves a view the user has already dragged elsewhere. Once it does
-     * move the bar off that end there is room again, so the next drag can ask
-     * for the page after this one.
-     * </p>
-     */
-    private void restoreColumnView() {
-        if (this.mainTable == null || this.mainTable.isDisposed() || this.columns == null) {
-            return;
-        }
-        int anchor = this.columnAnchor;
-        if (anchor < 0 || anchor >= this.columns.length) {
-            return;
-        }
-        if (!atEnd(this.mainTable.getHorizontalBar())) {
-            return;
-        }
-        this.mainTable.showColumn(this.columns[anchor]);
-    }
-
-    /**
-     * Runs {@link #restoreColumnView} a few times over the second that follows
-     * a page, then stops.
-     */
-    private void watchColumnView() {
-        if (this.columnViewWatch != null) {
-            this.display.timerExec(-1, this.columnViewWatch);
-            this.columnViewWatch = null;
-        }
-        nextColumnViewCheck(0);
-    }
-
-    private void nextColumnViewCheck(final int step) {
-        if (step >= COLUMN_VIEW_CHECKS.length) {
-            this.columnViewWatch = null;
-            return;
-        }
-        Runnable check = () -> {
-            this.columnViewWatch = null;
-            if (this.shell == null || this.shell.isDisposed()) {
-                return;
-            }
-            restoreColumnView();
-            nextColumnViewCheck(step + 1);
-        };
-        this.columnViewWatch = check;
-        this.display.timerExec(COLUMN_VIEW_CHECKS[step], check);
-    }
-
-    /** Drops the pending view check, because the window is going away. */
-    private void cancelColumnViewWatch() {
-        if (this.columnViewWatch != null) {
-            this.display.timerExec(-1, this.columnViewWatch);
-            this.columnViewWatch = null;
         }
     }
 
@@ -1194,12 +974,6 @@ public class TableWindow {
             return;
         }
         this.loadingMore = true;
-        /*
-         * How wide the table was before this page, so a page that brought no
-         * columns can be told apart from one that did: the former must not be
-         * asked for again until the bar leaves the end.
-         */
-        final int colsBefore = this.data == null ? 0 : this.data.getColCount();
         if (this.statusLabel != null && !this.statusLabel.isDisposed()) {
             this.statusLabel.setText(Messages.get("window.status.readingMore"));
         }
@@ -1215,14 +989,6 @@ public class TableWindow {
                     m.ensureShape(wantRows, wantCols);
                     snapshot = m.toData();
                 } catch (OperationCanceledException e) {
-                    /*
-                     * A cancelled page must not leave the flag set: it is what
-                     * keeps a second page from starting, so it would cost every
-                     * page after this one.
-                     */
-                    if (!shell.isDisposed()) {
-                        display.asyncExec(() -> loadingMore = false);
-                    }
                     return Status.CANCEL_STATUS;
                 } catch (Throwable t) {
                     failure = t;
@@ -1240,13 +1006,8 @@ public class TableWindow {
                         statusLabel.setText(Messages.bind("window.status.readMoreFailed",
                                 error.getClass().getSimpleName()
                                         + (error.getMessage() == null ? "" : " - " + error.getMessage())));
-                        columnPageStalled = cols;
                     } else {
                         applyData(result);
-                        if (cols && result.getColCount() <= colsBefore) {
-                            // Asked for columns, got none: stop asking.
-                            columnPageStalled = true;
-                        }
                     }
                 });
                 return Status.OK_STATUS;
@@ -1313,34 +1074,18 @@ public class TableWindow {
         int rows = this.data.getRowCount();
         boolean grows = rows > this.renderedRows
                 || dataColumns > (this.columns == null ? 0 : this.columns.length);
-        /*
-         * The column at the left edge of the view, taken before anything is
-         * inserted: a page has to leave the user looking at the same part of
-         * the table, and the platform is not always of that opinion. Recorded
-         * only when columns are about to arrive, and only from what is already
-         * on screen.
-         */
-        int anchor = dataColumns > (this.columns == null ? 0 : this.columns.length)
-                ? firstVisibleColumn()
-                : -1;
-        if (anchor >= 0) {
-            this.columnAnchor = anchor;
-        }
         if (grows) {
             this.mainTable.setRedraw(false);
             this.frozenTable.setRedraw(false);
         }
         try {
             syncColumns(headers, dataColumns);
-            syncCells(dataColumns, rows, anchor);
+            syncCells(dataColumns, rows);
         } finally {
             if (grows) {
                 this.mainTable.setRedraw(true);
                 this.frozenTable.setRedraw(true);
             }
-        }
-        if (anchor >= 0) {
-            watchColumnView();
         }
     }
 
@@ -1366,7 +1111,7 @@ public class TableWindow {
         }
     }
 
-    private void syncCells(int dataColumns, int rows, int anchor) {
+    private void syncCells(int dataColumns, int rows) {
         int firstNewRow = this.renderedRows;
         /* Columns already on screen; a new row needs all of them, an old one only the rest. */
         int knownCols = this.renderedCols;
@@ -1410,17 +1155,6 @@ public class TableWindow {
             this.autosizeColumns();
         } else {
             this.autosizeNewColumns();
-        }
-        /*
-         * Widths are final now, so the column that was at the left edge of the
-         * view before the page can be put back there. When nothing moved - the
-         * usual case - it is already on screen and this does nothing at all; it
-         * only earns its keep when the platform has scrolled the view while
-         * growing. A move that happens after this point, when the thumb is
-         * released, is caught by the repeated check in watchColumnView.
-         */
-        if (anchor >= 0 && this.columns != null && anchor < this.columns.length) {
-            this.mainTable.showColumn(this.columns[anchor]);
         }
         this.renderedRows = rows;
         this.renderedCols = Math.max(knownCols, dataColumns);
@@ -1484,68 +1218,6 @@ public class TableWindow {
         if (layout instanceof GridData) {
             ((GridData) layout).widthHint = w + 6;
         }
-    }
-
-    /**
-     * The column at the left edge of the view, or -1 when there is nothing
-     * loaded to look at.
-     * <p>
-     * The left edge rather than the right one because of how the view is put
-     * back: {@code showColumn} scrolls by the shortest distance that makes the
-     * column visible, so for a column that is off to the left it lands with that
-     * column's left edge on the left edge of the view - exactly the offset the
-     * user had. Asking it for the rightmost column instead would only scroll
-     * back until that column came into sight, one screen short of the place the
-     * user was looking at.
-     * </p>
-     * <p>
-     * Read from the scroll position and the column widths the table holds, not
-     * from the items: an item's bounds do not follow horizontal scrolling, so
-     * asking them where a column is gives the same answer at either end of the
-     * table.
-     * </p>
-     */
-    private int firstVisibleColumn() {
-        if (this.mainTable == null || this.mainTable.isDisposed()
-                || this.columns == null || this.columns.length == 0) {
-            return -1;
-        }
-        int offset = horizontalOffset();
-        int x = 0;
-        for (int c = 0; c < this.columns.length; c++) {
-            if (x + this.columns[c].getWidth() > offset) {
-                return c;
-            }
-            x += this.columns[c].getWidth();
-        }
-        return this.columns.length - 1;
-    }
-
-    /**
-     * How far the table is scrolled to the right, in pixels.
-     * <p>
-     * A table's scroll bar does not count in pixels. It counts in units of its
-     * own - the content width spread over {@code getMaximum()} - and at a HiDPI
-     * scale factor of 200% one pixel is two of them, which is enough to make a
-     * position read as "past the last column" when compared with column widths
-     * directly. Weighing it against the content width converts it back, whatever
-     * the factor is.
-     * </p>
-     */
-    private int horizontalOffset() {
-        ScrollBar bar = this.mainTable.getHorizontalBar();
-        if (bar == null || bar.isDisposed() || this.columns == null || this.columns.length == 0) {
-            return 0;
-        }
-        int max = bar.getMaximum();
-        int total = 0;
-        for (int c = 0; c < this.columns.length; c++) {
-            total += this.columns[c].getWidth();
-        }
-        if (max <= 0 || total <= 0) {
-            return 0;
-        }
-        return (int) ((long) bar.getSelection() * total / max);
     }
 
     /** Width of a column given its global index, from header plus the first rows. */
