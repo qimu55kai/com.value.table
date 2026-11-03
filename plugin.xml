@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+
+   <!-- ==================== command ==================== -->
+   <extension
+         point="org.eclipse.ui.commands">
+      <category
+            name="ValueTable"
+            id="com.value.table.commands.category">
+      </category>
+      <command
+            name="%command.showAsTable.name"
+            description="%command.showAsTable.description"
+            categoryId="com.value.table.commands.category"
+            id="com.value.table.commands.showAsTable">
+      </command>
+   </extension>
+
+   <!-- ==================== handler ==================== -->
+   <!--
+        enabledWhen keeps the toolbar button and the menu item greyed out
+        unless the current selection really contains a Java variable or a watch
+        expression.
+        <iterate> without an operator means "at least one element matches";
+        ifEmpty="false" makes it false for an empty selection.
+
+        An expression is not a variable: the Expressions view selects an
+        IExpression, so requiring IJavaVariable alone left the action disabled
+        there - which is why the Expressions view had a menu entry that never
+        worked.
+   -->
+   <extension
+         point="org.eclipse.ui.handlers">
+      <handler
+            commandId="com.value.table.commands.showAsTable"
+            class="com.value.table.handlers.SampleHandler">
+         <enabledWhen>
+            <with
+                  variable="selection">
+               <iterate
+                     ifEmpty="false">
+                  <or>
+                     <instanceof
+                           value="org.eclipse.jdt.debug.core.IJavaVariable">
+                     </instanceof>
+                     <instanceof
+                           value="org.eclipse.debug.core.model.IExpression">
+                     </instanceof>
+                  </or>
+               </iterate>
+            </with>
+         </enabledWhen>
+      </handler>
+   </extension>
+
+   <!-- ==================== key binding ==================== -->
+   <!--
+        Ctrl+Alt+V. Ctrl+Alt+T was the first choice but is already taken in
+        the window context by the Terminal and SVN plugins, so it never fired
+        reliably. Ctrl+Alt+V is unused by any bundle in a stock 2025-06 IDE.
+   -->
+   <extension
+         point="org.eclipse.ui.bindings">
+      <key
+            commandId="com.value.table.commands.showAsTable"
+            contextId="org.eclipse.ui.contexts.window"
+            schemeId="org.eclipse.ui.defaultAcceleratorConfiguration"
+            sequence="M1+M3+V">
+      </key>
+   </extension>
+
+   <!-- ==================== preference page ==================== -->
+   <!--
+        Nested under Java > Debug instead of sitting as its own top level
+        page: that is where a Java developer looks for debugger settings.
+   -->
+   <extension
+         point="org.eclipse.ui.preferencePages">
+      <page
+            class="com.value.table.preferences.ToolPreferencePage"
+            category="org.eclipse.jdt.debug.ui.JavaDebugPreferencePage"
+            id="com.value.table.preferences.ToolPreferencePage"
+            name="ValueTable">
+      </page>
+   </extension>
+
+   <!-- ==================== command icon ==================== -->
+   <!--
+        Registering the icon on the command itself, instead of repeating it on
+        every contribution, is what the platform uses for toolbar items: a
+        command contribution renders as an empty, invisible item when its
+        image cannot be resolved, which looks exactly like "the button is
+        missing". Contributions can still override it.
+   -->
+   <extension
+         point="org.eclipse.ui.commandImages">
+      <image
+            commandId="com.value.table.commands.showAsTable"
+            icon="icons/valuetable.png">
+      </image>
+   </extension>
+
+   <!-- ==================== menus and toolbars ==================== -->
+   <extension
+         point="org.eclipse.ui.menus">
+
+      <!--
+           A toolbar group of our own, placed right after the debug launch
+           group (Run / Debug / Coverage / Profile) in the main toolbar.
+
+           Contributing a <command> straight into another bundle's nested
+           toolbar id does not reliably render: that toolbar is built by
+           debug.ui for its own contributions and an item added from outside
+           can end up in a group that never gets laid out. Contributing a
+           <toolbar> to the main toolbar is the same pattern debug.ui itself
+           uses, and it always gets a group.
+      -->
+      <menuContribution
+            locationURI="toolbar:org.eclipse.ui.main.toolbar?after=org.eclipse.debug.ui.launch.toolbar">
+         <toolbar
+               id="com.value.table.toolbar"
+               label="ValueTable">
+            <command
+                  commandId="com.value.table.commands.showAsTable"
+                  icon="icons/valuetable.png"
+                  label="%command.showAsTable.name"
+                  tooltip="%command.showAsTable.tooltip"
+                  id="com.value.table.menus.mainToolbar"
+                  style="push">
+            </command>
+         </toolbar>
+      </menuContribution>
+
+      <!-- Variables view, local toolbar (the natural place to look for it) -->
+      <menuContribution
+            locationURI="toolbar:org.eclipse.debug.ui.VariableView?after=additions">
+         <command
+               commandId="com.value.table.commands.showAsTable"
+               icon="icons/valuetable.png"
+               tooltip="%command.showAsTable.tooltip"
+               id="com.value.table.menus.variablesToolbar">
+         </command>
+      </menuContribution>
+
+      <!-- Variables view, context menu -->
+      <menuContribution
+            locationURI="popup:org.eclipse.debug.ui.VariableView?after=additions">
+         <command
+               commandId="com.value.table.commands.showAsTable"
+               icon="icons/valuetable.png"
+               id="com.value.table.menus.variablesPopup"
+               style="push">
+            <visibleWhen
+                  checkEnabled="false">
+               <with
+                     variable="selection">
+                  <iterate
+                        ifEmpty="false">
+                     <instanceof
+                           value="org.eclipse.jdt.debug.core.IJavaVariable">
+                     </instanceof>
+                  </iterate>
+               </with>
+            </visibleWhen>
+         </command>
+      </menuContribution>
+
+      <!-- Expressions view, local toolbar - same action, same reason -->
+      <menuContribution
+            locationURI="toolbar:org.eclipse.debug.ui.ExpressionView?after=additions">
+         <command
+               commandId="com.value.table.commands.showAsTable"
+               icon="icons/valuetable.png"
+               tooltip="%command.showAsTable.tooltip.expression"
+               id="com.value.table.menus.expressionsToolbar">
+         </command>
+      </menuContribution>
+
+      <!--
+           Expressions view, context menu. The selection there is an
+           IExpression, not an IJavaVariable, so the test has to accept both -
+           otherwise the item is filtered out and the menu looks empty.
+      -->
+      <menuContribution
+            locationURI="popup:org.eclipse.debug.ui.ExpressionView?after=additions">
+         <command
+               commandId="com.value.table.commands.showAsTable"
+               icon="icons/valuetable.png"
+               id="com.value.table.menus.expressionsPopup"
+               style="push">
+            <visibleWhen
+                  checkEnabled="false">
+               <with
+                     variable="selection">
+                  <iterate
+                        ifEmpty="false">
+                     <or>
+                        <instanceof
+                              value="org.eclipse.jdt.debug.core.IJavaVariable">
+                        </instanceof>
+                        <instanceof
+                              value="org.eclipse.debug.core.model.IExpression">
+                        </instanceof>
+                     </or>
+                  </iterate>
+               </with>
+            </visibleWhen>
+         </command>
+      </menuContribution>
+
+   </extension>
+
+   <!-- ==================== early startup ==================== -->
+   <!--
+        The double click hook for the Expressions view has to be attached while
+        the workbench is being built: it needs a workbench instance and the UI
+        thread, and there is no extension point for "a click in someone else's
+        view".
+   -->
+   <extension
+         point="org.eclipse.ui.startup">
+      <startup
+            class="com.value.table.Startup">
+      </startup>
+   </extension>
+</plugin>

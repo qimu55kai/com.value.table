@@ -1,0 +1,56 @@
+How to describe a class:
+
+  class & arrayGetter & rowName & colName
+
+  class       : full java name, e.g. java.util.Map
+  arrayGetter : how to get the row collection from the object
+                method()returnType  -> call a method, e.g. entrySet()java.util.Set
+                fieldName            -> read a field
+                @allFields           -> use all fields of the object
+                [m1,m2()]            -> the row itself is these members
+  rowName     : row labels
+                method()returnType  -> call a method
+                fieldName            -> read a field
+                [a,b,c]              -> literal labels
+                null                 -> use 0..n-1
+  colName     : column labels, same syntax as rowName
+
+Example:
+  java.util.Map&entrySet()java.util.Set&null&[key,value]
+  java.util.Map$Entry&[key(),value()]&null&[key,value]
+
+The first rule turns a map into its entries, the second says what one
+entry shows: the key and the value, two cells, instead of the entry's
+toString(). A member written without a return type is called as
+()Ljava/lang/Object;, which is what a generic getter declares; a
+getter returning int or a concrete type has to name it.
+
+Columns of a list of objects:
+
+  A list whose elements are objects of one class needs no rule. The columns
+  are the instance fields of the element type, supertypes included, static
+  fields excluded. The "Columns..." button of a table window writes one line
+  per type for this:
+
+      com.demo.Employee#id,name,salary
+
+  Such a line describes the table of exactly that type. A Person line does
+  not change an Employee table, and the other way round; a type without a
+  line of its own is read from its whole hierarchy.
+
+Tip: arrays and classes implementing Iterable/Iterator work without
+any configuration.
+
+About method calls:
+
+  Reading a table executes toString() and the methods named in your
+  rules inside the target VM. A few methods are never called, because
+  they block, wait for a lock or end the session: wait, notify,
+  join, sleep, lock, await, close, shutdown, exit and similar.
+  Add your own names to the blacklist on this preference page.
+
+  Every call runs on a background thread, so a slow target never
+  freezes Eclipse. It cannot be cancelled either: if the called code
+  waits for a lock held by another suspended thread, the call never
+  returns and that thread has to be resumed before the table can be
+  read again.

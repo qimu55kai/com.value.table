@@ -1,0 +1,49 @@
+如何描述一个类：
+
+  类名 & 取行集合 & 行标签 & 列标签
+
+  类名        ：完整 java 名，例如 java.util.Map
+  取行集合    ：怎么从这个对象上拿到"一行行"的东西
+                方法()返回类型  -> 调一个方法，例如 entrySet()java.util.Set
+                字段名          -> 读一个字段
+                @allFields      -> 用这个对象的所有字段
+                [m1,m2()]       -> 一行就是这几个成员，顺序即列序
+  行标签      ：每一行左边显示什么
+                方法()返回类型  -> 调一个方法
+                字段名          -> 读一个字段
+                [a,b,c]         -> 固定的几个标签
+                null            -> 用 0..n-1
+  列标签      ：列头，语法同行标签
+
+例子：
+  java.util.Map&entrySet()java.util.Set&null&[key,value]
+  java.util.Map$Entry&[key(),value()]&null&[key,value]
+
+第一条把 Map 变成它的一个个 entry，第二条说明一个 entry 显示什么：
+key 和 value 两格，而不是 entry 的 toString()。不写返回类型的成员按
+()Ljava/lang/Object; 调用，这是泛型 getter 的声明；返回 int 或具体
+类型的方法必须写出返回类型。
+
+对象列表的列：
+
+  元素都是同一个类的对象时不需要规则。列就是这个类型的实例字段，
+  父类声明的也算，静态字段不算。表格窗口的"设置列…"按钮会为每个类型
+  写一行：
+
+      com.demo.Employee#id,name,salary
+
+  这样一行只描述元素类型正好是这个类型的那张表。Person 那一行不影响
+  Employee 表，反过来也一样；自己没有一行的类型，按整个继承链读取。
+
+提示：数组和实现了 Iterable/Iterator 的类不需要任何配置。
+
+关于方法调用：
+
+  读一张表会在目标 JVM 里执行 toString() 和你规则里点名的方法。有些
+  方法永远不会被调用，因为它们会阻塞、等锁或结束会话：wait、notify、
+  join、sleep、lock、await、close、shutdown、exit 等。自己还想禁用的
+  方法名可以加到本页的黑名单里。
+
+  每个调用都在后台线程上跑，所以目标再慢也不会卡住 Eclipse。但它也
+  取消不了：如果被调用的代码在等另一条已挂起线程持有的锁，这个调用
+  就永远不返回，那条线程得先恢复，这张表才能重新读取。
