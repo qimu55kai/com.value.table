@@ -27,7 +27,6 @@ public class Config {
     public static final String BLACKLIST = "invokeBlacklist";
     public static final String FETCH_TIMEOUT = "fetchTimeoutSeconds";
     public static final String MAX_ROWS = "maxRows";
-    public static final String MAX_COLS = "maxCols";
     /** Also show no-argument methods as columns of an entity table. */
     public static final String ENTITY_METHODS = "entityMethods";
 
@@ -183,11 +182,6 @@ public class Config {
     public static int getMaxRows() {
         int v = store() == null ? 2000 : store().getInt(MAX_ROWS);
         return v <= 0 ? 2000 : v;
-    }
-
-    public static int getMaxCols() {
-        int v = store() == null ? 200 : store().getInt(MAX_COLS);
-        return v <= 0 ? 200 : v;
     }
 
     public static Set<String> getBlacklist() {

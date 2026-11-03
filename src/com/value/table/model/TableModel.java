@@ -229,7 +229,16 @@ public class TableModel extends ValueModel {
             }
         }
 
-        int cols = Math.min(Math.max(wantCols, loadedCols), context.getMaxCols());
+        /*
+         * Nothing but the data itself caps the width. There used to be a fixed
+         * ceiling here - 200 columns, applied to every table whether it asked
+         * for one or not - and it was invisible: past 200 columns paging simply
+         * stopped, and the remaining columns of a wider array could not be
+         * reached at all. A page is only read when the user scrolls to it, and
+         * one column costs one read per row already loaded, which is the same
+         * price as a row page; the ceiling saved nothing and hid data.
+         */
+        int cols = Math.max(wantCols, loadedCols);
         if (entityRule != null) {
             cols = Math.min(cols, entityRule.members.size());
         } else {
@@ -865,7 +874,7 @@ public class TableModel extends ValueModel {
 
     /** True while there are columns the table has not read yet. */
     public boolean hasMoreColumns() {
-        return loadedCols < Math.min(totalCols, context.getMaxCols());
+        return loadedCols < totalCols;
     }
 
     public EntityRule getEntityRule() {

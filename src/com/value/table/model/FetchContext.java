@@ -41,7 +41,6 @@ public class FetchContext {
 
     private final IProgressMonitor monitor;
     private final int maxRows;
-    private final int maxCols;
     private final boolean invokeEnabled;
     private final boolean monitorGuard;
     private final Set<String> blacklist;
@@ -53,11 +52,10 @@ public class FetchContext {
     private int invocations;
     private int skippedInvocations;
 
-    public FetchContext(IProgressMonitor monitor, int maxRows, int maxCols,
+    public FetchContext(IProgressMonitor monitor, int maxRows,
             boolean invokeEnabled, boolean monitorGuard, Set<String> blacklist) {
         this.monitor = monitor;
         this.maxRows = maxRows > 0 ? maxRows : Integer.MAX_VALUE;
-        this.maxCols = maxCols > 0 ? maxCols : Integer.MAX_VALUE;
         this.invokeEnabled = invokeEnabled;
         this.monitorGuard = monitorGuard;
         this.blacklist = blacklist == null ? Collections.<String>emptySet() : blacklist;
@@ -93,10 +91,6 @@ public class FetchContext {
 
     public int getMaxRows() {
         return maxRows;
-    }
-
-    public int getMaxCols() {
-        return maxCols;
     }
 
     public int getInvocations() {

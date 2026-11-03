@@ -897,7 +897,7 @@ public class TableWindow {
         this.job = new Job(Messages.bind("job.read", name)) {
             @Override
             protected IStatus run(IProgressMonitor monitor) {
-                FetchContext context = new FetchContext(monitor, Config.getMaxRows(), Config.getMaxCols(),
+                FetchContext context = new FetchContext(monitor, Config.getMaxRows(),
                         Config.isInvokeEnabled(), Config.isMonitorGuard(), Config.getBlacklist());
                 TableData snapshot = null;
                 Throwable failure = null;

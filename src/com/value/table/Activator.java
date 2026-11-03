@@ -35,7 +35,6 @@ public class Activator extends AbstractUIPlugin {
         store.setDefault(Config.BLACKLIST, Config.DEFAULT_BLACKLIST);
         store.setDefault(Config.FETCH_TIMEOUT, 10);
         store.setDefault(Config.MAX_ROWS, 2000);
-        store.setDefault(Config.MAX_COLS, 200);
         store.setDefault(Config.ENTITY_METHODS, false);
         store.setDefault(Config.LANGUAGE, Config.LANGUAGE_SYSTEM);
         /*

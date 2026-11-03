@@ -207,7 +207,7 @@ public final class EntityResolver {
             }
 
             EntityRule rule = new EntityRule(base.getSignature(), EntityRule.simpleName(base.getName()),
-                    limit(members, model));
+                    members);
             if (!configured) {
                 CACHE.put(key, rule);
             }
@@ -931,17 +931,5 @@ public final class EntityResolver {
             return className.replace('.', '/');
         }
         return Util.getSignature(className);
-    }
-
-    private static List<MemberRef> limit(List<MemberRef> members, ValueModel model) {
-        int max = model == null ? Integer.MAX_VALUE : model.getContext().getMaxCols();
-        if (members.size() <= max) {
-            return members;
-        }
-        if (model != null) {
-            model.getContext().warn("entity.cols.limit",
-                    Messages.bind("warn.columns.limit", max, members.size()));
-        }
-        return new ArrayList<MemberRef>(members.subList(0, max));
     }
 }

@@ -67,7 +67,7 @@ public abstract class ValueModel {
     private ValueModel(Map<String, UserClassType> userTypeMap, FetchContext context) {
         this.userTypeMap = userTypeMap;
         this.context = context == null
-                ? new FetchContext(null, 0, 0, true, true, null)
+                ? new FetchContext(null, 0, true, true, null)
                 : context;
     }
 
