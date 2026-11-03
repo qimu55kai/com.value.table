@@ -26,6 +26,7 @@ import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Point;
+import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.layout.RowLayout;
@@ -89,6 +90,12 @@ public class TableWindow {
     private static final int INDEX_W = 52;
     /** Prefix of the build stamp; technical, so it is not translated. */
     private static final String BUILD_PREFIX = "build ";
+    /**
+     * Each item carries its row number, because painting a cell has to know
+     * which row it belongs to and {@code Table.indexOf} walks the whole native
+     * list to find out - once per cell, on every scroll.
+     */
+    private static final String ROW_KEY = "valuetable.row";
 
     private final IJavaVariable variable;
     /**
@@ -127,8 +134,9 @@ public class TableWindow {
     /**
      * The cell rectangle the user dragged out, in global columns. The table's
      * own selection is only ever one row - a table row is a record - so the
-     * rectangle is tracked here and painted as cell backgrounds, which is also
-     * what makes Ctrl+C copy a block rather than a row.
+     * rectangle is tracked here and painted as cell backgrounds by
+     * {@link #hookCellPainting}, which is also what makes Ctrl+C copy a block
+     * rather than a row.
      */
     private int selAnchorRow = -1;
     private int selAnchorCol = -1;
@@ -280,10 +288,10 @@ public class TableWindow {
          * A selected row is drawn by the platform in the list selection colour,
          * which would hide both the heat map and the rectangle. Clearing the
          * SELECTED flag while erasing makes the platform draw the cell as if it
-         * were not selected; the rectangle below is then the only highlight.
+         * were not selected; the fill painted below is then the only highlight.
          */
-        this.frozenTable.addListener(SWT.EraseItem, event -> clearSelected(event));
-        this.mainTable.addListener(SWT.EraseItem, event -> clearSelected(event));
+        hookCellPainting(this.frozenTable, 0);
+        hookCellPainting(this.mainTable, 1);
 
         this.hookInput(this.frozenTable, 0);
         this.hookInput(this.mainTable, 1);
@@ -326,10 +334,51 @@ public class TableWindow {
         this.createBottomBar();
     }
 
-    private static void clearSelected(Event event) {
-        if ((event.detail & SWT.SELECTED) != 0) {
-            event.detail &= ~SWT.SELECTED;
-        }
+    /**
+     * Paints the fill behind every cell: the selection block, the heat map and
+     * the zebra stripe, all decided by {@link #backgroundFor}.
+     * <p>
+     * The fill is painted here, in EraseItem, instead of being handed to
+     * {@code TableItem.setBackground}. With item colours the platform erases
+     * the one cell that holds the focus again after the colour was set, so the
+     * row a drag started on stayed white with a dotted rectangle around it
+     * while the rest of the block was selected - the copy said four rows, the
+     * picture said three. Drawing the rectangle ourselves also means only the
+     * cells on screen are ever coloured: the old code called setBackground once
+     * per cell of every loaded row, which is thousands of invalidations for a
+     * table whose colour mode nobody changed on screen.
+     * </p>
+     *
+     * @param offset global column of this table's first column: 0 for the
+     *               pinned label table, 1 for the main one
+     */
+    private void hookCellPainting(final Table table, final int offset) {
+        table.addListener(SWT.EraseItem, event -> {
+            /*
+             * Three detail bits off, one line each:
+             * SELECTED - the platform would paint its own selection colour
+             *            over the fill below;
+             * FOCUSED  - would ring the focused cell in a dotted rectangle,
+             *            which is wrong for a block of many cells;
+             * BACKGROUND - would fill the cell before we do.
+             */
+            event.detail &= ~(SWT.SELECTED | SWT.FOCUSED | SWT.BACKGROUND);
+            if (event.item == null || this.data == null || this.columns == null) {
+                return;
+            }
+            TableItem item = (TableItem) event.item;
+            Object tag = item.getData(ROW_KEY);
+            int row = tag instanceof Integer ? ((Integer) tag).intValue() : table.indexOf(item);
+            Color fill = backgroundFor(item, row, event.index + offset, event.index,
+                    colorModeIndex(), table.getBackground());
+            event.gc.setBackground(fill);
+            event.gc.fillRectangle(event.x, event.y, event.width, event.height);
+        });
+    }
+
+    /** The colour mode the combo box is on; 0 before the bar exists. */
+    private int colorModeIndex() {
+        return this.colorMode == null ? 0 : this.colorMode.getSelectionIndex();
     }
 
     private void installKeyFilter() {
@@ -539,18 +588,22 @@ public class TableWindow {
         repaint(minRow, maxRow, minCol, maxCol);
     }
 
-    /** Repaints a block of cells, global columns, with the current mode. */
+    /**
+     * Redraws a block of cells, global columns, so the next paint asks
+     * {@link #backgroundFor} again for every cell in it.
+     * <p>
+     * Only the block is invalidated: a drag fires on every mouse move, and
+     * repainting a 100 x 100 page each time is visible.
+     * </p>
+     */
     private void repaint(int rowFrom, int rowTo, int colFrom, int colTo) {
         if (this.data == null) {
             return;
         }
-        int mode = this.colorMode == null ? 0 : this.colorMode.getSelectionIndex();
         if (this.frozenTable != null && !this.frozenTable.isDisposed() && colFrom <= 0 && colTo >= 0) {
-            Color plain = this.frozenTable.getBackground();
             int last = Math.min(rowTo, this.frozenTable.getItemCount() - 1);
             for (int i = Math.max(rowFrom, 0); i <= last; i++) {
-                TableItem item = this.frozenTable.getItem(i);
-                item.setBackground(0, backgroundFor(item, i, 0, 0, mode, plain));
+                redrawCell(this.frozenTable, i, 0);
             }
         }
         if (this.mainTable == null || this.mainTable.isDisposed() || this.columns == null) {
@@ -558,16 +611,26 @@ public class TableWindow {
         }
         int lo = Math.max(colFrom - 1, 0);
         int hi = Math.min(colTo - 1, this.columns.length - 1);
-        if (hi < lo) {
-            return;
-        }
-        Color plain = this.mainTable.getBackground();
         int last = Math.min(rowTo, this.mainTable.getItemCount() - 1);
         for (int i = Math.max(rowFrom, 0); i <= last; i++) {
-            TableItem item = this.mainTable.getItem(i);
             for (int c = lo; c <= hi; c++) {
-                item.setBackground(c, backgroundFor(item, i, c + 1, c, mode, plain));
+                redrawCell(this.mainTable, i, c);
             }
+        }
+    }
+
+    /**
+     * Invalidates one cell. A row that is scrolled out of sight has no
+     * rectangle to invalidate, which is fine: it is erased again - and coloured
+     * again - the moment it is scrolled back in.
+     */
+    private static void redrawCell(Table table, int row, int cell) {
+        if (cell >= table.getColumnCount()) {
+            return;
+        }
+        Rectangle bounds = table.getItem(row).getBounds(cell);
+        if (bounds.width > 0 && bounds.height > 0) {
+            table.redraw(bounds.x, bounds.y, bounds.width, bounds.height, false);
         }
     }
 
@@ -1025,15 +1088,17 @@ public class TableWindow {
         }
         for (int i = 0; i < rows; i++) {
             TableItem label = this.frozenTable.getItem(i);
+            label.setData(ROW_KEY, Integer.valueOf(i));
             String name = this.data.getRowName()[i];
             String text = name == null ? "" : name;
             if (!text.equals(label.getText(0))) {
                 label.setText(text);
             }
+            TableItem item = this.mainTable.getItem(i);
+            item.setData(ROW_KEY, Integer.valueOf(i));
             if (dataColumns == 0) {
                 continue;
             }
-            TableItem item = this.mainTable.getItem(i);
             if (i >= firstNewRow || this.renderedCols < dataColumns) {
                 String[] line = new String[dataColumns];
                 for (int j = 0; j < dataColumns; j++) {
@@ -1177,12 +1242,20 @@ public class TableWindow {
         if (this.mainTable == null || this.mainTable.isDisposed() || this.data == null) {
             return;
         }
-        int rows = Math.min(this.mainTable.getItemCount(), this.data.getRowCount());
         if (this.columns == null || this.columns.length == 0) {
             return;
         }
+        int rows = Math.min(this.mainTable.getItemCount(), this.data.getRowCount());
         this.heatMap.ensureRanges(this.data, rows, this.columns.length);
-        repaint(0, rows - 1, 0, this.columns.length);
+        /*
+         * Nothing to apply cell by cell: the colours are chosen while a cell is
+         * painted, so invalidating the two tables is all it takes, and only the
+         * cells on screen cost anything.
+         */
+        if (this.frozenTable != null && !this.frozenTable.isDisposed()) {
+            this.frozenTable.redraw();
+        }
+        this.mainTable.redraw();
     }
 
     /**
