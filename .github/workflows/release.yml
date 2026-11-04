@@ -32,15 +32,18 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: What is being built with
-        run: |
-          java -version
-          mvn -version
-
+      # ./mvnw, not mvn: the wrapper pins Maven 3.9.9, which is the version the
+      # build is known to work with. The runner's own Maven is not that.
       - name: Build the update site
         run: |
           set -o pipefail
-          mvn -B -ntp -f releng/pom.xml clean package 2>&1 | tee build.log
+          {
+            echo "--- java ---"
+            java -version
+            echo "--- maven ---"
+            ./mvnw -version
+          } 2>&1 | tee build.log
+          ./mvnw -B -ntp -f releng/pom.xml clean package 2>&1 | tee -a build.log
 
       - name: Check what was built
         run: |
