@@ -43,6 +43,32 @@
 
 > 安装对话框底部那个 **Contact all update sites during install to find required software** 请取消勾选。本插件只用平台上已有的 JDT / UI bundle，不需要去别处找依赖；勾着它，p2 可能顺带把平台侧上百个 bundle 换成别的发布版本，装完 eclemma、产品图标之类会一起坏掉。
 
+<details>
+<summary>为什么「只装一个插件」会连着升级上百个 bundle</summary>
+
+那个勾选框在 p2 里的默认值是 **开**（`Policy.contactAllSites = true`，`AvailableIUsPage` 在没有任何记忆值时就取这个默认）。勾着的含义是：解析安装计划时，把所有已启用的更新站点都算进去，并为计划里的每个 IU 挑「能满足约束的最新版本」。而 EPP 包默认启用的站点里有几个是**复合站点，内容会自己往前跑**：
+
+| 站点 | 行为 |
+| --- | --- |
+| `download.eclipse.org/releases/latest` | 每季度自动指向新的发布列车 |
+| `download.eclipse.org/technology/epp/packages/latest` | 同上，EPP 包本体 |
+| `download.eclipse.org/webtools/repository/latest` | WTP 最新构建 |
+| `download.eclipse.org/technology/m2e/releases/latest` | m2e 最新版 |
+| `download.eclipse.org/eclipse/updates/4.36` | 当前平台的 SR 更新 |
+
+于是「装一个只在平台上已有 bundle 上有依赖的插件」，也可能把 EMF、jetty、asm、icu 一并换到下一年的版本，重启时几百个文件要重写，看着就像卡死。本插件自己的站点只有 3 个 IU（插件 + feature + category），物理上提供不了这些 bundle。
+
+**避免办法**，按性价比排序：
+
+1. 装之前取消勾选上面那个 *Contact all update sites…*。
+2. *Preferences > Install/Update > Available Software Sites*：把带 `latest` 的站点取消勾选，只留与 IDE 版本对应的那条（例如 `releases/2025-06`），再加自己的站点。这一条是长效的。
+3. *Preferences > Install/Update > Automatic Updates*：取消 *Automatically find new updates and notify me*，避免后台自己排计划。
+4. 自己的插件最稳的是离线装（dropins，或把 `releng/com.value.table.site/target/repository` 当本地站点），完全不碰 p2 的仓库解析。
+
+（不推荐在 feature/manifest 里给平台 bundle 加死上限来「防升级」：那样只是把静默升级换成安装直接失败。）
+
+</details>
+
 **放进 dropins**：
 
 1. 把 `com.value.table_1.0.0.jar` 放进 `<eclipse>/dropins/`。

@@ -46,6 +46,47 @@ restart.
 > bundles for a different release train along the way, and things like eclemma
 > and the product branding break with it.
 
+<details>
+<summary>Why installing one plug-in can upgrade a hundred bundles</summary>
+
+That checkbox defaults to **on** in p2 (`Policy.contactAllSites = true`;
+`AvailableIUsPage` falls back to it when no remembered value exists). Ticked, it
+means: when the install plan is resolved, take every enabled update site into
+account and, for each IU in the plan, pick the newest version that satisfies the
+constraints. An EPP package enables several sites that are **composite and move
+on their own**:
+
+| Site | Behaviour |
+| --- | --- |
+| `download.eclipse.org/releases/latest` | follows the newest release train, every quarter |
+| `download.eclipse.org/technology/epp/packages/latest` | same, for the EPP package itself |
+| `download.eclipse.org/webtools/repository/latest` | newest WTP build |
+| `download.eclipse.org/technology/m2e/releases/latest` | newest m2e |
+| `download.eclipse.org/eclipse/updates/4.36` | service releases for the current platform |
+
+So "install a plug-in that only needs bundles the platform already ships" can
+still drag EMF, jetty, asm and icu to next year's builds; the restart then has
+hundreds of files to rewrite, which reads as a hang. This plug-in's own site
+publishes three IUs (plug-in, feature, category) and physically cannot supply
+those bundles.
+
+**How to avoid it**, best value first:
+
+1. Untick *Contact all update sites…* before installing.
+2. *Preferences > Install/Update > Available Software Sites*: untick the ones
+   ending in `latest`, keep only the line matching your IDE version (e.g.
+   `releases/2025-06`), then add your own site. This is the durable fix.
+3. *Preferences > Install/Update > Automatic Updates*: clear *Automatically find
+   new updates and notify me* so nothing is scheduled in the background.
+4. For your own plug-in, install offline (dropins, or point the wizard at
+   `releng/com.value.table.site/target/repository`) and skip repository
+   resolution entirely.
+
+(Putting hard upper bounds on the platform bundles to "prevent upgrades" is not
+recommended: it only turns a silent upgrade into a failed install.)
+
+</details>
+
 **Into dropins**:
 
 1. Copy `com.value.table_1.0.0.jar` into `<eclipse>/dropins/`.
