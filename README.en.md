@@ -4,6 +4,8 @@
 
 An Eclipse plug-in that shows a debug variable or a watch expression as a table, so a `List<Employee>`, a `Map`, or a `double[][]` can be read by scrolling and sorting with your eyes instead of expanding nodes in the Variables view.
 
+![A list of objects shown as a table](docs/marketplace/screenshots/01-object-table.png)
+
 ## What it does
 
 * **Any variable, as a table.** Select it in the Variables view, in Inspect, or as a watch expression, and pick *Show as Table* (`Ctrl+Alt+V`). Arrays, `Map`, collections, and lists of your own objects all work.
@@ -37,6 +39,12 @@ A skipped call only changes what a value looks like; it is reported in the warni
 **From the update site** (recommended): *Help > Install New Software… > Add*,
 enter `https://qimu55kai.github.io/com.value.table/`, pick **ValueTable**, and
 restart.
+
+> Untick **Contact all update sites during install to find required software**.
+> The plug-in only uses JDT / UI bundles that the platform already has, so there
+> is nothing to go looking for. Left ticked, p2 may swap a hundred-plus platform
+> bundles for a different release train along the way, and things like eclemma
+> and the product branding break with it.
 
 **Into dropins**:
 

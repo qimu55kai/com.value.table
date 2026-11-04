@@ -131,16 +131,24 @@ silently.</p>
 
 ## Screenshots
 
-Marketplace shows them at 600 px wide; capture at 2x and scale down, in the
-light theme, with the window maximised enough to show a full page.
+Marketplace shows them at 600 px wide, so they are stored at 1000-1250 px: the
+text stays sharp, and nothing has to be upscaled.
 
-1. **The table itself** - a `List<Employee>` or a numeric matrix, showing the
-   frozen row labels, the heat map, and the horizontal scroll bar. This is the
-   one that has to sell it.
-2. **The way in** - Variables view with a variable selected and the context menu
-   open on *Show as Table*.
-3. **Columns...** - the per-type rule dialog, so the "no configuration needed,
-   but it is configurable" claim is visible.
+| File | What it shows | Upload order |
+| --- | --- | --- |
+| `docs/marketplace/screenshots/01-object-table.png` | a `List<Employee>`: frozen row labels, heat map on `salary`, `getDept()` as a column | 1 |
+| `docs/marketplace/screenshots/02-matrix.png` | an `int[][]` with no member metadata, so the columns are indices | 2 |
+| `docs/marketplace/screenshots/03-show-as-table.png` | the Variables view context menu with *Show as Table* - the way in | 3 |
+| `docs/marketplace/screenshots/04-column-sources.png` | the *Columns...* dialog, one tab per type, "what saving writes" under it | 4 |
+| `docs/marketplace/screenshots/05-preferences.png` | the preference page: per-type rules, the call switches, the row cap | 5 |
+
+The listing only needs the first three; the last two answer "is it configurable"
+and "is it safe" without a paragraph of text.
+
+Two things that are deliberately **not** in that folder: a crop of the main
+toolbar (155 px wide, unreadable at listing size) and any screenshot of the
+workbench itself (that is Eclipse's window, not this plug-in's).
+
 
 ## Releasing a new version
 

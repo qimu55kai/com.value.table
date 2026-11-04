@@ -4,6 +4,8 @@
 
 一个 Eclipse 调试插件：把调试变量或监视表达式显示成表格。这样 `List<Employee>`、`Map`、`double[][]` 这类数据可以靠滚动和排序直接看，而不必在「变量」视图里一层层展开节点。
 
+![对象列表显示成表格](docs/marketplace/screenshots/01-object-table.png)
+
 ## 功能
 
 * **任何变量都能变表格。** 在「变量」视图、Inspect 弹窗或监视表达式里选中变量，执行 *Show as Table*（`Ctrl+Alt+V`）。数组、`Map`、集合、以及自定义对象的 `List` 都支持。
@@ -38,6 +40,8 @@
 
 *Help > Install New Software… > Add*，地址填
 `https://qimu55kai.github.io/com.value.table/`，选中 **ValueTable**，装完重启。
+
+> 安装对话框底部那个 **Contact all update sites during install to find required software** 请取消勾选。本插件只用平台上已有的 JDT / UI bundle，不需要去别处找依赖；勾着它，p2 可能顺带把平台侧上百个 bundle 换成别的发布版本，装完 eclemma、产品图标之类会一起坏掉。
 
 **放进 dropins**：
 
