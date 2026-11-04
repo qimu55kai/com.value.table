@@ -35,20 +35,58 @@ tag v1.0.0 ──▶ GitHub Actions: ./mvnw -f releng/pom.xml package
    *Help → Install New Software… → Add*, paste that URL, and install
    **ValueTable**. If this fails, a Marketplace listing would fail the same way.
 
+Last checked 2026-11-04: `index.html`, `content.jar`, `artifacts.jar`,
+`p2.index` and `plugins/com.value.table_1.0.0.jar` all return 200, and the p2
+director run against the live URL resolves
+
+```
+com.value.table.feature.feature.group=1.0.0
+com.value.table=1.0.0
+valuetable=1.0.0.2--cKA8nh
+```
+
+which is exactly what Marketplace Client reads before it installs.
+
+## Submitting the listing
+
+Marketplace is a Drupal site behind Eclipse.org SSO, and the "add" page is
+login-gated (`/content/add` returns 404 to anyone anonymous). So the last click
+is yours:
+
+1. Log in at <https://marketplace.eclipse.org/> - the same account as
+   Eclipse.org / Bugzilla; if you have none, create one at
+   <https://accounts.eclipse.org/user/register>.
+2. **Add Content** in the top navbar -> content type **Solutions** (that is the
+   type that carries an update site; *Training & Consulting* is the other one
+   and is not what this is).
+3. Fill the form with the values below, upload the logo and the screenshots,
+   submit.
+4. It lands in the moderation queue; the quickstart says it should appear
+   within 24 business hours. Later edits go through **My Marketplace**.
+
+Fields that decide whether *Install* works at all: **Update Site** and
+**Feature ID**. Everything else is presentation.
+
 ## Listing fields
 
 | Field | Value |
 | --- | --- |
 | Title | `ValueTable` |
+| Short description | see *Short description* below, English block |
+| Categories | `IDE`, `Tools` (there is no "Debugging" category; the closest comparable, Mirur Visual Debugger, files under `IDE`/`Profiling`/`Testing`) |
+| Tags | `eclipse`, `java`, `debugging`, `debug`, `variables`, `watch`, `table`, `matrix`, `jdt` |
+| Image | `docs/marketplace/logo-128.png` (128x128 PNG) |
+| Screenshots | `docs/marketplace/screenshots/01..05`, in that order |
+| **Update site** | `https://qimu55kai.github.io/com.value.table/` |
+| **Feature ID** | `com.value.table.feature.feature.group` |
 | Version | `1.0.0` (must match `Bundle-Version`) |
-| Update site | `https://qimu55kai.github.io/com.value.table/` |
 | License | Eclipse Public License 2.0 |
-| Categories | Debug, Tools |
-| Tags | `debug`, `table`, `variables`, `watch`, `jdt`, `matrix`, `list`, `map` |
-| Company / author | `qimu55kai` |
+| Eclipse Versions | `2025-06 (4.36)` - tick only what was actually run; the description states the real floor |
+| Platform Support | Windows, Mac, Linux/GTK |
+| Organization Name | `qimu55kai` |
+| Development Status | Production/Stable |
 | Source | `https://github.com/qimu55kai/com.value.table` |
-| Support | `https://github.com/qimu55kai/com.value.table/issues` |
-| Logo | `docs/marketplace/logo-128.png` |
+| Support / issue tracker | `https://github.com/qimu55kai/com.value.table/issues` |
 
 ## Short description
 
