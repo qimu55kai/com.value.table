@@ -1,0 +1,61 @@
+name: Release
+
+# Builds the p2 update site and publishes it to GitHub Pages.
+#
+# Every tag builds; so does a manual run, which is how a first publication is
+# tried without inventing a version number for it. The published site always
+# holds one release, the newest: p2 keeps working without older ones, and a
+# repository that only ever grows is a repository nobody prunes.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  update-site:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build the update site
+        run: mvn -B -ntp -f releng/pom.xml clean package
+
+      - name: Check what was built
+        run: |
+          set -e
+          site=releng/com.value.table.site/target/repository
+          # A repository without these two is a directory of jars, not a p2
+          # site, and Eclipse would fail with "no repository found".
+          test -f "$site/content.jar"
+          test -f "$site/artifacts.jar"
+          test -d "$site/plugins"
+          test -d "$site/features"
+          echo "--- repository ---"
+          find "$site" -maxdepth 2 -type f | sort
+
+      - name: Add a landing page
+        run: cp releng/site-index.html releng/com.value.table.site/target/repository/index.html
+
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: releng/com.value.table.site/target/repository
+          enable_jekyll: false
+          commit_message: 'Update site for ${{ github.ref_name }}'

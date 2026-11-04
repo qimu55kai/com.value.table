@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <!--
+    The build root: aggregator, and the parent every project here inherits the
+    Tycho setup from.
+
+        mvn -f releng/pom.xml clean package
+
+    The plug-in is the repository root, so it joins the reactor through ".."
+    instead of living in a directory of its own. Moving it into a subdirectory
+    would be the tidier Maven layout, but it would also move the Eclipse
+    project, and this is a working debug plug-in before it is a published one.
+  -->
+  <groupId>com.value.table</groupId>
+  <artifactId>com.value.table.releng</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+
+  <name>ValueTable Release Engineering</name>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <tycho.version>4.0.13</tycho.version>
+    <!-- The release the plug-in is compiled and tested against. -->
+    <eclipse.release>2025-06</eclipse.release>
+  </properties>
+
+  <modules>
+    <module>..</module>
+    <module>com.value.table.feature</module>
+    <module>com.value.table.site</module>
+  </modules>
+
+  <repositories>
+    <repository>
+      <id>eclipse-release</id>
+      <layout>p2</layout>
+      <url>https://download.eclipse.org/releases/${eclipse.release}</url>
+    </repository>
+  </repositories>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.eclipse.tycho</groupId>
+        <artifactId>tycho-maven-plugin</artifactId>
+        <version>${tycho.version}</version>
+        <extensions>true</extensions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.eclipse.tycho</groupId>
+        <artifactId>tycho-packaging-plugin</artifactId>
+        <version>${tycho.version}</version>
+        <configuration>
+          <!-- The fourth version segment stamped into every built bundle. -->
+          <format>'v'yyyyMMdd-HHmm</format>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.eclipse.tycho</groupId>
+        <artifactId>target-platform-configuration</artifactId>
+        <version>${tycho.version}</version>
+        <configuration>
+          <!--
+            One environment: this bundle has no native code.
+
+            JavaSE-21 is what the 2025-06 platform itself requires (its own
+            jdt.core.manipulation declares 21), so a lower resolution context
+            cannot see the bundles this plug-in builds against. The bundle keeps
+            Bundle-RequiredExecutionEnvironment: JavaSE-11, which is its source
+            level and what it needs from the JVM it runs on.
+          -->
+          <executionEnvironment>JavaSE-21</executionEnvironment>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>

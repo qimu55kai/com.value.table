@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site>
+   <!--
+        What the update site offers, and how Install New Software groups it.
+        version="0.0.0" means "whatever the reactor built", so the feature's
+        own version is not repeated here.
+   -->
+   <feature id="com.value.table.feature" version="0.0.0">
+      <category name="valuetable"/>
+   </feature>
+
+   <category-def name="valuetable" label="ValueTable">
+      <description>
+         Table views for debug variables in the Eclipse Java debugger.
+      </description>
+   </category-def>
+</site>
