@@ -32,8 +32,15 @@ jobs:
           java-version: '21'
           cache: maven
 
+      - name: What is being built with
+        run: |
+          java -version
+          mvn -version
+
       - name: Build the update site
-        run: mvn -B -ntp -f releng/pom.xml clean package
+        run: |
+          set -o pipefail
+          mvn -B -ntp -f releng/pom.xml clean package 2>&1 | tee build.log
 
       - name: Check what was built
         run: |
@@ -59,3 +66,23 @@ jobs:
           publish_dir: releng/com.value.table.site/target/repository
           enable_jekyll: false
           commit_message: 'Update site for ${{ github.ref_name }}'
+
+      # Actions logs are only readable by someone signed in, which is no help
+      # to the person who has to fix a build they cannot log into. On failure
+      # the log goes to a branch instead, where anyone can fetch it.
+      - name: Keep the log of a failed build
+        if: failure()
+        continue-on-error: true
+        run: |
+          mkdir -p /tmp/ci-log
+          if [ -f build.log ]; then cp build.log /tmp/ci-log/build.log; else
+            printf 'no build.log was produced\n' > /tmp/ci-log/build.log
+          fi
+          cd /tmp/ci-log
+          git init -q -b ci-log
+          git add build.log
+          git -c user.name="github-actions" -c user.email="actions@github.com" \
+              commit -q -m "Build log for ${GITHUB_REF_NAME} (run ${GITHUB_RUN_ID})"
+          git push -q --force \
+              "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
+              HEAD:ci-log
