@@ -67,10 +67,10 @@ Or import this project into Eclipse as a plug-in project and use *Export > Deplo
 
 ## Build
 
-**The update site** (Tycho; needs JDK 17+ and Maven):
+**The update site** (Tycho; needs JDK 17+, Maven comes from the wrapper):
 
 ```sh
-mvn -f releng/pom.xml clean package
+./mvnw -f releng/pom.xml clean package
 ```
 
 The result is `releng/com.value.table.site/target/repository/` - a p2 repository

@@ -7,7 +7,7 @@ produce a p2 repository somewhere with a stable HTTPS address before a listing
 means anything.
 
 ```
-tag v1.0.0 ──▶ GitHub Actions: mvn -f releng/pom.xml package
+tag v1.0.0 ──▶ GitHub Actions: ./mvnw -f releng/pom.xml package
             ──▶ gh-pages branch: content.jar artifacts.jar features/ plugins/
             ──▶ https://qimu55kai.github.io/com.value.table/
             ──▶ marketplace.eclipse.org listing points here
@@ -25,9 +25,9 @@ tag v1.0.0 ──▶ GitHub Actions: mvn -f releng/pom.xml package
 
 ## One-time setup
 
-1. **Push this branch**, then run the workflow once by hand:
-   *Actions → Release → Run workflow*. It builds without needing a tag and
-   publishes to `gh-pages`.
+1. **Push a tag** (`v1.0.0`) or run the workflow by hand: *Actions → Release →
+   Run workflow*. It builds the site and pushes it to a `gh-pages` branch,
+   which is what the steps below then serve.
 2. **Enable Pages**: *Settings → Pages → Source: Deploy from a branch →
    `gh-pages` / `/ (root)`*. The site is live at
    `https://qimu55kai.github.io/com.value.table/`.

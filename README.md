@@ -68,10 +68,10 @@
 
 ## 构建
 
-**更新站点 / 发布产物**（Tycho，需要 JDK 17+ 与 Maven）：
+**更新站点 / 发布产物**（Tycho，需要 JDK 17+，Maven 由 wrapper 提供）：
 
 ```sh
-mvn -f releng/pom.xml clean package
+./mvnw -f releng/pom.xml clean package
 ```
 
 产物在 `releng/com.value.table.site/target/repository/`，就是一个 p2 仓库：`content.jar`、`artifacts.jar`、`features/`、`plugins/`。把它放到任意 HTTPS 静态目录下，就可以作为更新站点使用。打 `v*` tag 会由 GitHub Actions 自动构建并发布到 `gh-pages`，细节见 [docs/marketplace.md](docs/marketplace.md)。
