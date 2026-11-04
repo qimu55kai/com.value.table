@@ -29,10 +29,16 @@ A skipped call only changes what a value looks like; it is reported in the warni
 
 ## Requirements
 
-* Eclipse 2023-06 or newer (built and tested against 2025-06), JavaSE-11 or newer
+* Eclipse 2023-06 or newer (built and tested against 2025-06), Java 17 or newer
 * The debugger: this is a JDT debug plug-in, so JDT must be present
 
 ## Install
+
+**From the update site** (recommended): *Help > Install New Software… > Add*,
+enter `https://qimu55kai.github.io/com.value.table/`, pick **ValueTable**, and
+restart.
+
+**Into dropins**:
 
 1. Copy `com.value.table_1.0.0.jar` into `<eclipse>/dropins/`.
 2. Restart Eclipse completely. (Replacing the jar under a running Eclipse breaks that instance until it is restarted - the window shows its build time in the bottom right corner, which is the quickest way to tell which jar is live.)
@@ -61,13 +67,22 @@ Or import this project into Eclipse as a plug-in project and use *Export > Deplo
 
 ## Build
 
-This repository holds the plug-in project only, so the build goes through Eclipse PDE:
+**The update site** (Tycho; needs JDK 17+ and Maven):
 
-1. *File > Import > Existing Projects into Workspace*, and pick this directory;
-2. *Project > Export > Deployable plug-ins and fragments*, exported as a jar;
-3. Drop the jar into `<eclipse>/dropins/` and restart Eclipse completely.
+```sh
+mvn -f releng/pom.xml clean package
+```
 
-The scripted build used during development (compile, package, stamp the build time, install) and the offline tests are kept in a separate development workspace and are not part of this repository.
+The result is `releng/com.value.table.site/target/repository/` - a p2 repository
+(`content.jar`, `artifacts.jar`, `features/`, `plugins/`). Serve it from any
+HTTPS directory and that URL is an update site. Pushing a `v*` tag has GitHub
+Actions build and publish it to `gh-pages`; see
+[docs/marketplace.md](docs/marketplace.md).
+
+**A single jar** (for `dropins/`): *Project > Export > Deployable plug-ins and
+fragments* in Eclipse, or the `_build/build.sh` of the development workspace
+(compile, stamp the build time, package, install), which is not part of this
+repository.
 
 ## Layout
 
@@ -81,6 +96,10 @@ src/com/value/table/
 plugin.properties            text the platform reads from plugin.xml - English only
 help.txt / help_zh_CN.txt    rule syntax, one file per language
 icons/  META-INF/  plugin.xml  build.properties
+pom.xml                      the plug-in itself (Tycho reads MANIFEST from here)
+releng/                      feature, update site, release engineering
+docs/marketplace.md          how it is listed on Eclipse Marketplace
+.github/workflows/           build and publish the update site on a tag
 ```
 
 ## Adding a language

@@ -3,7 +3,9 @@ Bundle-ManifestVersion: 2
 Bundle-Name: ValueTable
 Bundle-SymbolicName: com.value.table;singleton:=true
 Bundle-Version: 1.0.0
-Bundle-Vendor: ValueTable
+Bundle-Vendor: qimu55kai
+Bundle-License: https://www.eclipse.org/legal/epl-2.0/
+Bundle-DocURL: https://github.com/qimu55kai/com.value.table
 Bundle-RequiredExecutionEnvironment: JavaSE-11
 Bundle-Activator: com.value.table.Activator
 Bundle-ActivationPolicy: lazy

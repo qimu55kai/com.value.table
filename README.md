@@ -29,10 +29,17 @@
 
 ## 环境要求
 
-* Eclipse 2023-06 或更新（开发与验证基于 2025-06），JavaSE-11 及以上
+* Eclipse 2023-06 或更新（开发与验证基于 2025-06），Java 17 及以上
 * 必须带 JDT：这是一个 JDT 调试插件，没有 JDT 无法工作
 
 ## 安装
+
+**从更新站点安装**（推荐）：
+
+*Help > Install New Software… > Add*，地址填
+`https://qimu55kai.github.io/com.value.table/`，选中 **ValueTable**，装完重启。
+
+**放进 dropins**：
 
 1. 把 `com.value.table_1.0.0.jar` 放进 `<eclipse>/dropins/`。
 2. 完全重启 Eclipse。（在 Eclipse 运行中替换 jar 会让那个实例出错，直到重启为止——窗口右下角显示当前 jar 的构建时间，是判断「现在跑的是哪个 jar」最快的方式。）
@@ -61,13 +68,15 @@
 
 ## 构建
 
-本仓库只包含插件工程本身，构建走 Eclipse PDE：
+**更新站点 / 发布产物**（Tycho，需要 JDK 17+ 与 Maven）：
 
-1. *File > Import > Existing Projects into Workspace*，选择本目录；
-2. *Project > Export > Deployable plug-ins and fragments*，导出为 jar；
-3. 把 jar 放进 `<eclipse>/dropins/` 并完全重启。
+```sh
+mvn -f releng/pom.xml clean package
+```
 
-作者使用的脚本化构建（编译、打包、写入构建时间、自动安装）和离线测试在开发工作区中维护，不随本仓库发布。
+产物在 `releng/com.value.table.site/target/repository/`，就是一个 p2 仓库：`content.jar`、`artifacts.jar`、`features/`、`plugins/`。把它放到任意 HTTPS 静态目录下，就可以作为更新站点使用。打 `v*` tag 会由 GitHub Actions 自动构建并发布到 `gh-pages`，细节见 [docs/marketplace.md](docs/marketplace.md)。
+
+**单个 jar**（放进 `dropins/` 用）：在 Eclipse 里 *Project > Export > Deployable plug-ins and fragments* 导出，或使用开发工作区里的 `_build/build.sh`（编译、写入构建时间、打包、自动安装，不随本仓库发布）。
 
 ## 目录结构
 
@@ -81,6 +90,10 @@ src/com/value/table/
 plugin.properties            平台从 plugin.xml 读取的文案 —— 仅英文
 help.txt / help_zh_CN.txt    规则语法说明，一种语言一个文件
 icons/  META-INF/  plugin.xml  build.properties
+pom.xml                      插件工程本体（Tycho 从这里读 MANIFEST）
+releng/                      feature、更新站点、发布工程
+docs/marketplace.md          上架 Eclipse Marketplace 的流程与文案
+.github/workflows/           打 tag 自动构建并发布更新站点
 ```
 
 ## 多语言说明
